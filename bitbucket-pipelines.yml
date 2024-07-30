@@ -1,0 +1,56 @@
+pipelines:
+  branches:
+    '{feature/*,refactor/*}':
+      - step:
+          name: Deploy twigs
+          runs-on:
+            - self.hosted
+            - linux.shell
+            - server210
+          script:
+            - cd /home/osangu/work/llm-server
+            - export RANDOM_PORT=shuf -i 8000-13000 -n 1
+            - git checkout ${BITBUCKET_BRANCH}
+            - git pull origin ${BITBUCKET_BRANCH}
+            - export DOCKER_HOST=unix:///var/run/docker.sock
+            - docker build -t llm-server:${BITBUCKET_BRANCH} -f Dockerfile .
+            - docker run -it -d -p ${RANOM_PORT}:8000 --name llm-server/${BITBUCKET_BRANCH} llm-server:${BITBUCKET_BRANCH}
+
+    dev:
+      - step:
+          name: Deploy Dev
+          runs-on:
+            - self.hosted
+            - linux.shell
+            - server210
+          script:
+            - cd /home/osangu/Work/llm-server
+            - git checkout ${BITBUCKET_BRANCH}
+            - git pull origin
+            - git pull
+            - export DOCKER_HOST=unix:///var/run/docker.sock
+            - docker build -t llm-server -f Dockerfile .
+            - docker stop llm-server
+            - docker rm llm-server
+            - docker image prune -a --force --filter "until=480h"
+            - docker run -it -d -p 8000:8000 --name llm-server --restart=always llm-server
+
+    master:
+      - step:
+          name: Deploy product
+          runs-on:
+            - self.hosted
+            - linux.shell
+            - server211
+          script:
+              - cd /home/osangu/llm-server
+              - git config --global --add safe.directory /home/osangu/llm-server
+              - git pull
+              - export DOCKER_HOST=unix:///var/run/docker.sock
+              - docker build -t llm-server -f Dockerfile .
+              - docker stop llm-server
+              - docker rm llm-server
+              - docker run -it -d -p 8888:8000 --name llm-server --network=nginx-bridge --restart=always llm-server
+              - docker stop llm-server2
+              - docker rm llm-server2
+              - docker run -it -d -p 8889:8000 --name llm-server2 --network=nginx-bridge --restart=always llm-server
